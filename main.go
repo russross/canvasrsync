@@ -39,7 +39,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  * Assignment description\n")
 		fmt.Fprintf(os.Stderr, "  * Student login\n")
 		fmt.Fprintf(os.Stderr, "  * Student name\n")
-		fmt.Fprintf(os.Stderr, "  * Student email\n\n")
+		fmt.Fprintf(os.Stderr, "  * Student email\n")
+		fmt.Fprintf(os.Stderr, "If filter terms are used, the delete phase at the end is skipped.\n\n")
 		fmt.Fprintf(os.Stderr, "Recognized flags:\n")
 		flag.PrintDefaults()
 	}
@@ -251,6 +252,11 @@ func syncCourse(courseID int, terms []string) {
 				fmt.Printf("    %s:%s has submission of type %s (skipping))\n", submission.User.LoginID, submission.User.Name, submission.SubmissionType)
 			}
 		}
+	}
+
+	if len(terms) > 0 {
+		fmt.Printf("skipping delete phase because filter terms were present\n")
+		return
 	}
 
 	// delete files and directories that were not synced
