@@ -30,15 +30,33 @@ func main() {
 
 	var courseID int
 
-	flag.IntVar(&courseID, "course", 0, "course ID")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [flags] [filter terms]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "If filter terms are supplied, a submission will only be downloaded\n")
+		fmt.Fprintf(os.Stderr, "if every term is satisfied. A term is satisfied if it is a\n")
+		fmt.Fprintf(os.Stderr, "case-insensitive substring match for any of the following:\n")
+		fmt.Fprintf(os.Stderr, "  * Assignment name\n")
+		fmt.Fprintf(os.Stderr, "  * Assignment description\n")
+		fmt.Fprintf(os.Stderr, "  * Student login\n")
+		fmt.Fprintf(os.Stderr, "  * Student name\n")
+		fmt.Fprintf(os.Stderr, "  * Student email\n\n")
+		fmt.Fprintf(os.Stderr, "Recognized flags:\n")
+		flag.PrintDefaults()
+	}
+	flag.IntVar(&courseID, "course", 0, "course ID (required)")
 	flag.StringVar(&directory, "dir", ".", "directory to download into")
 	flag.BoolVar(&dry, "dry", false, "dry run")
 	flag.BoolVar(&normalize, "despace", true, "convert spaces in file names to underscores")
 	flag.Parse()
 
+	var terms []string
+	for _, raw := range flag.Args() {
+		terms = append(terms, strings.ToLower(raw))
+	}
+
 	switch {
 	case courseID > 0:
-		syncCourse(courseID)
+		syncCourse(courseID, terms)
 
 	default:
 		flag.Usage()
@@ -90,8 +108,10 @@ type Attachment struct {
 }
 
 type User struct {
-	LoginID string `json:"login_id"`
-	Name    string `json:"name"`
+	LoginID   string `json:"login_id"`
+	Name      string `json:"name"`
+	ShortName string `json:"short_name"`
+	Email     string `json:"email"`
 }
 
 func normalizeName(ugly string) string {
@@ -101,7 +121,7 @@ func normalizeName(ugly string) string {
 	return strings.Replace(ugly, " ", "_", -1)
 }
 
-func syncCourse(courseID int) {
+func syncCourse(courseID int, terms []string) {
 	now := time.Now()
 	currentDirs := make(map[string]bool)
 	currentFiles := make(map[string]bool)
@@ -155,7 +175,24 @@ func syncCourse(courseID int) {
 		submissionsURL := fmt.Sprintf("%s/api/v1/courses/%d/assignments/%d/submissions?include[]=user&per_page=1000", apiEndpoint, courseID, asst.ID)
 		mustFetch(submissionsURL, &submissions)
 
+	submissionLoop:
 		for _, submission := range submissions {
+			if len(terms) > 0 {
+				// skip this submission if it does not match all of the filter terms
+				desc := strings.ToLower(asst.Name + "," +
+					asst.Description + "," +
+					submission.User.LoginID + "," +
+					submission.User.Name + "," +
+					submission.User.ShortName + "," +
+					submission.User.Email)
+				for _, term := range terms {
+					if !strings.Contains(desc, term) {
+						fmt.Printf("    %s:%s does not match filter term %q\n", submission.User.LoginID, submission.User.Name, term)
+						continue submissionLoop
+					}
+				}
+			}
+
 			switch submission.SubmissionType {
 			case "":
 				fmt.Printf("    %s:%s has no submission\n", submission.User.LoginID, submission.User.Name)
