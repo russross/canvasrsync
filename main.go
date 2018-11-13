@@ -254,11 +254,6 @@ func syncCourse(courseID int, terms []string) {
 		}
 	}
 
-	if len(terms) > 0 {
-		fmt.Printf("skipping delete phase because filter terms were present\n")
-		return
-	}
-
 	// delete files and directories that were not synced
 	courseRoot := filepath.Join(directory, normalizeName(course.CourseCode))
 	currentDirs[courseRoot] = true
@@ -269,6 +264,11 @@ func syncCourse(courseID int, terms []string) {
 			return err
 		}
 		if info.IsDir() && !currentDirs[path] {
+			if len(terms) > 0 {
+				// if there were search terms, ignore directories we did not update
+				// do not even walk into the directory
+				return filepath.SkipDir
+			}
 			dirsToDelete = append(dirsToDelete, path)
 		} else if !info.IsDir() && !currentFiles[path] {
 			filesToDelete = append(filesToDelete, path)

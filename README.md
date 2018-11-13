@@ -119,11 +119,17 @@ by student or by assignment or both.
 File deletion
 -------------
 
-When you do NOT apply a filter, the tool will attempt to sync the
-course directory with the current content on Canvas. This means that
-it will only download files that are new or that have changed
-(unchanged files do not need to be re-downloaded), but it also means
-that it will delete files in the course directory that do not match
-what is currently in Canvas. This normally happens when a student
-changes her submission or drops the course, but it also means that
-files you create while grading will be deleted on the next sync.
+The tool will attempt to sync the course directory with the current
+content on Canvas. This means that it will only download files that
+are new or that have changed (unchanged files do not need to be
+re-downloaded), but it also means that it will delete files in the
+course directory that do not match what is currently in Canvas. This
+normally happens when a student changes her submission or drops the
+course, but it also means that files you create while grading will
+be deleted on the next sync.
+
+If you run the tool with search terms, deleting will only happen
+within directories that were synced, i.e., within directories for
+projects and students that matched the search terms. If you run it
+with no search terms, it will delete any file in the directory tree
+that it does not recognize.
