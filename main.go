@@ -210,6 +210,9 @@ func syncCourse(courseID int, terms []string) {
 					// these are current names, so do not delete them later
 					currentDirs[asstDir] = true
 					currentDirs[userDir] = true
+					if currentFiles[path] {
+						fmt.Printf("!!! WARNING!! Multiple files with same name! Last one wins! name: %s\n", attachment.Filename)
+					}
 					currentFiles[path] = true
 
 					// see if the file already exists and is unchanged
