@@ -22,6 +22,7 @@ var dry bool
 var normalize bool
 
 func main() {
+	log.SetFlags(log.Ltime | log.Lshortfile)
 	token := os.Getenv("CANVAS_TOKEN")
 	if token == "" {
 		log.Fatalf("Must set CANVAS_TOKEN environment variable")
@@ -94,6 +95,7 @@ type Submission struct {
 	User           User          `json:"user"`
 	SubmissionType string        `json:"submission_type"`
 	Attachments    []*Attachment `json:"attachments"`
+	Body           string        `json:"body"`
 }
 
 type Attachment struct {
@@ -154,7 +156,12 @@ func syncCourse(courseID int, terms []string) {
 
 		onlineUpload := false
 		for _, elt := range asst.SubmissionTypes {
-			if elt == "online_upload" {
+			if elt == "online_upload" || elt == "online_text_entry" {
+				onlineUpload = true
+				break
+			}
+			if elt == "external_tool" {
+				msg += " (external tool, checking for online text entry)"
 				onlineUpload = true
 				break
 			}
@@ -250,6 +257,53 @@ func syncCourse(courseID int, terms []string) {
 					if err := os.Chtimes(path, attachment.ModifiedAt, attachment.ModifiedAt); err != nil {
 						log.Fatalf("setting timestamp: %v", err)
 					}
+				}
+			case "online_text_entry":
+				if len(submission.Body) == 0 {
+					fmt.Printf("    %s:%s has empty submission body (skipping))\n", submission.User.LoginID, submission.User.Name)
+				}
+				fmt.Printf("    %s:%s submitted at %v\n", submission.User.LoginID, submission.User.Name, submission.SubmittedAt.Local())
+				filename := "body.html"
+
+				// process the submission body
+				asstDir := filepath.Join(directory, normalizeName(course.CourseCode), normalizeName(asst.Name))
+				userDir := filepath.Join(asstDir, normalizeName(fmt.Sprintf("%s:%s", submission.User.LoginID, submission.User.Name)))
+				path := filepath.Join(userDir, filename)
+
+				// these are current names, so do not delete them later
+				currentDirs[asstDir] = true
+				currentDirs[userDir] = true
+				if currentFiles[path] {
+					fmt.Printf("!!! WARNING!! Multiple files with same name! Last one wins! name: %s\n", filename)
+				}
+				currentFiles[path] = true
+
+				// see if the file already exists and is unchanged
+				info, err := os.Stat(path)
+				if err == nil && info.Size() == int64(len(submission.Body)) && info.ModTime().Round(time.Second).Equal(submission.SubmittedAt.Round(time.Second)) {
+					fmt.Printf("        (unchanged) %s\n", filename)
+					continue
+				}
+
+				// if we were asked to not actually change anything, then do not download it
+				if dry {
+					fmt.Printf("        need to save %s (size %d) modified at %v\n", filename, len(submission.Body), submission.SubmittedAt.Local())
+					continue
+				}
+
+				// make sure the directory exists
+				if err := os.MkdirAll(userDir, 0755); err != nil {
+					log.Fatalf("creating directory %s: %v", userDir, err)
+				}
+
+				// save the file
+				if err := ioutil.WriteFile(path, []byte(submission.Body), 0644); err != nil {
+					log.Fatalf("saving file: %v", err)
+				}
+
+				// sync the timestamp
+				if err := os.Chtimes(path, submission.SubmittedAt, submission.SubmittedAt); err != nil {
+					log.Fatalf("setting timestamp: %v", err)
 				}
 			default:
 				fmt.Printf("    %s:%s has submission of type %s (skipping))\n", submission.User.LoginID, submission.User.Name, submission.SubmissionType)
