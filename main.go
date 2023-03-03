@@ -156,12 +156,7 @@ func syncCourse(courseID int, terms []string) {
 
 		onlineUpload := false
 		for _, elt := range asst.SubmissionTypes {
-			if elt == "online_upload" || elt == "online_text_entry" {
-				onlineUpload = true
-				break
-			}
-			if elt == "external_tool" {
-				msg += " (external tool, checking for online text entry)"
+			if elt == "online_upload" || elt == "online_text_entry" || elt == "external_tool" {
 				onlineUpload = true
 				break
 			}
